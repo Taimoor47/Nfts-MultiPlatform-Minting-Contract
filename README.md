@@ -8,7 +8,7 @@ https://testnets.opensea.io/collection/devil-ix2419cidk
 
 Deployed Contract Addresses
 
-Goreli: 0x41F5c114CB46DC3Babd48C7C499d6b2a87e8e657
+Goerli: 0x41F5c114CB46DC3Babd48C7C499d6b2a87e8e657
 
 Rinkeby: 0x810b305aecceb6716bf16b60505d0e8adb38d1fe
 
