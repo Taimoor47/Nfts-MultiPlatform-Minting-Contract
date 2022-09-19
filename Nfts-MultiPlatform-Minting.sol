@@ -7,19 +7,22 @@ import '@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol';
 import '@openzeppelin/contracts/security/Pausable.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 
-contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownable {
+contract SuperPikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownable {
     constructor(
         uint256 _totalLimit,
         uint256 _whitelistLimit,
-        uint256 _plateformLimit
+        uint256 _platformLimit
     ) ERC721('Super Pikachu', 'SPK') {
         baseURI = 'https://gateway.pinata.cloud/ipfs/';
         mintingBool = true;
-        if (_whitelistLimit + _plateformLimit > totalLimit) {
+        if (_whitelistLimit + _platformLimit > totalLimit) {
             totalLimit = _totalLimit;
-            whitelistLimit = _whitelistLimit;
-            plateformLimit = _plateformLimit;
-            publicLimit = totalLimit - (whitelistLimit + plateformLimit);
+            whitelistLimitLeft = _whitelistLimit;
+            totalwhitelistLimit = _whitelistLimit;
+            platformLimitLeft = _platformLimit;
+            totalPlatformLimit = _platformLimit;
+            publicLimitLeft = totalLimit - (whitelistLimitLeft + platformLimitLeft);
+            totalPublicLimit = totalLimit - (whitelistLimitLeft + platformLimitLeft);
         } else {
             revert NotEqualToTotalLimit();
         }
@@ -38,32 +41,35 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
     string public publicSales = 'Unactive';
     string public mintingStatus = 'Active';
     uint256 public totalLimit;
-    uint256 public whitelistLimit;
-    uint256 public plateformLimit;
-    uint256 public publicLimit;
+    uint256 public whitelistLimitLeft;
+    uint256 public platformLimitLeft;
+    uint256 public publicLimitLeft;
     uint256 public userLimit = 5;
     uint256 private totalLimitCount;
-    uint256 private whitelistCount;
-    uint256 private publicCount;
-    uint256 private plateformCount;
+    uint256 public totalwhitelistLimit;
+    uint256 public totalPublicLimit;
+    uint256 public totalPlatformLimit;
     bool private mintingBool;
     bool private publicSaleBool;
 
     // Mappings
 
-    mapping(uint256 => nftinfo) public NftData;
+    mapping(uint256 => nftinfo) public nftData;
     mapping(address => bool) public isWhitelistedUser;
     mapping(address => bool) public isWhitelistedAdmin;
     mapping(address => uint256) public userMintedStatus;
 
     // Events
 
-    event whitlistUserMinited(address caller,address mintedto,uint tokenId,string name);
-    event pulblicUserMinited(address caller,address mintedto,uint tokenId,string name);
-    event AdminMinited(address caller,address mintedto,uint tokenId,string name);
+    event WhitlistUserMinited(address calledby,address mintedto,uint tokenId,string name);
+    event PulblicUserMinited(address calledby,address mintedto,uint tokenId,string name);
+    event AdminMinited(address calledby,address mintedto,uint tokenId,string name);
     event AdminWhitelisted(address owner,address adminwhitelised );
     event UserWhitelistd(address whitlister,address userwhitelised );
     event AdminRemoved(address removedby,address adminremoved);
+    event UserRemoved(address removedby,address userremoved);
+    event UpdatedBaseUrl(address updatedby);
+    event MintingLimitUpdated(address updatedby,uint limit);
 
     // Custom Erros
 
@@ -80,6 +86,7 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
     error UserLimitReached(address addrs, uint256 limit);
     error PleaseCheckValue(uint256 limit);
     error AlreadyActive(string status);
+    
 
     // All Miniting Functions
 
@@ -93,10 +100,10 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
      * @param tokenId- nft Id 
      * @param _name- name 
      * @param _metadataHash - metadatahash
-     * Emits a {whitlistUserMinited} event.
+     * Emits a {WhitlistUserMinited} event.
     */
 
-    function userMinting(
+    function whitelistMinting(
         address to,
         uint256 tokenId,
         string memory _name,
@@ -110,17 +117,17 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
         revert NotWhitelistedUser(msg.sender);
         if (totalLimitCount >= totalLimit) 
         revert TotalLimitReached(totalLimit);
-        if (whitelistCount >= whitelistLimit) 
-        revert MintingLimitReached(whitelistLimit);
+        if (whitelistLimitLeft <= 0) 
+        revert MintingLimitReached(totalwhitelistLimit);
         if (userMintedStatus[msg.sender] >= userLimit)
         revert UserLimitReached(msg.sender, userLimit);
 
         _safeMint(to, tokenId);
-        NftData[tokenId] = nftinfo(_name, _metadataHash);
-        whitelistCount++;
+        nftData[tokenId] = nftinfo(_name, _metadataHash);
         totalLimitCount++;
+        whitelistLimitLeft--;
         userMintedStatus[msg.sender]++;
-        emit whitlistUserMinited(msg.sender,to,tokenId,_name);
+        emit WhitlistUserMinited(msg.sender,to,tokenId,_name);
     }
 
     /**
@@ -131,7 +138,7 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
      * @param tokenId- nft Id 
      * @param _name- name 
      * @param _metadataHash - metadatahash
-     * Emits a {pulblicUserMinited} event.
+     * Emits a {PulblicUserMinited} event.
     */
 
     function publicMinting(
@@ -146,17 +153,17 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
          revert PublicSaleUnactive();
         if (totalLimitCount >= totalLimit)
          revert TotalLimitReached(totalLimit);
-        if (publicCount >= publicLimit)
-         revert MintingLimitReached(publicLimit);
+        if (publicLimitLeft <= 0)
+         revert MintingLimitReached(totalPublicLimit);
         if (userMintedStatus[msg.sender] >= userLimit)
         revert UserLimitReached(msg.sender, userLimit);
 
         _safeMint(to, tokenId);
-        NftData[tokenId] = nftinfo(_name, _metadataHash);
-        publicCount++;
+        nftData[tokenId] = nftinfo(_name, _metadataHash);
         totalLimitCount++;
+        publicLimitLeft--;
         userMintedStatus[msg.sender]++;
-        emit pulblicUserMinited(msg.sender,to,tokenId,_name);
+        emit PulblicUserMinited(msg.sender,to,tokenId,_name);
     }
 
     /**
@@ -167,7 +174,7 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
      * @param tokenId- nft Id 
      * @param _name- name 
      * @param _metadataHash - metadatahash
-     * Emits a {pulblicUserMinited} event.
+     * Emits a {PulblicUserMinited} event.
     */
 
     function platformMinting(
@@ -180,18 +187,19 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
          revert NotWhitelistedAdmin(msg.sender);
         if (totalLimitCount >= totalLimit)
          revert TotalLimitReached(totalLimit);
-        if (plateformCount >= plateformLimit)
-         revert MintingLimitReached(plateformLimit);
+        if (platformLimitLeft <= 0)
+         revert MintingLimitReached(totalPlatformLimit);
 
         _safeMint(to, tokenId);
-        NftData[tokenId] = nftinfo(_name, _metadataHash);
-        plateformCount++;
+        nftData[tokenId] = nftinfo(_name, _metadataHash);
         totalLimitCount++;
+        platformLimitLeft--;
         emit AdminMinited(msg.sender,to,tokenId,_name);
     }
 
-    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
-        return string(abi.encodePacked(baseURI, NftData[tokenId].Hash));
+    function tokenURI(uint256 tokenId) public view override
+    (ERC721, ERC721URIStorage) returns (string memory) {
+        return string(abi.encodePacked(baseURI, nftData[tokenId].Hash));
     }
 
     /**
@@ -199,12 +207,14 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
      * Requirement:
      * - This function can only called by whitelisted admin
      * @param _Url - new Baseurl 
+     * Emits a {UpdatedBaseUrl} event.
     */
 
-     function updateBaseurl(string memory _Url) public {
+    function updateBaseurl(string memory _Url) public {
         if (isWhitelistedAdmin[msg.sender] == false)
         revert NotWhitelistedAdmin(msg.sender);
         baseURI = _Url;
+        emit UpdatedBaseUrl(msg.sender);
     }
 
     /**
@@ -212,6 +222,7 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
      * Requirement:
      * - This function can only called by whitelisted admin
      * @param limit - new limit
+     * Emits a {MintingLimitUpdated} event.
     */
 
     function updateMintingLimit(uint256 limit) public {
@@ -219,6 +230,7 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
         revert NotWhitelistedAdmin(msg.sender);
         if (limit <= 0) revert PleaseCheckValue(limit);
         userLimit = limit;
+        emit MintingLimitUpdated(msg.sender,limit);
     }
 
     /**
@@ -226,20 +238,37 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
      * Requirement:
      * - This function can only called by whitelisted admin
      * @param _address - user address
+     * Emits a {UserWhitelistd} event.
     */
 
     function whitelistUser(address _address) public {
-        if (isWhitelistedAdmin[msg.sender] == false)
+        if(isWhitelistedAdmin[msg.sender] == false)
          revert WhitelistedAdminAllowed();
         isWhitelistedUser[_address] = true;
         emit UserWhitelistd(msg.sender,_address);
     }
 
     /**
+     * @dev removeWUser is used to remove the Whitelistd User.
+     * Requirement:
+     * - This function can only called by owner of the contract
+     * @param _address -  admint address
+     * Emits a {UserRemoved} event.
+    */
+    
+    function removeWUser(address _address) public onlyOwner{
+        if( isWhitelistedUser[_address] == false) 
+        revert NotWhitelistedUser(_address);
+        isWhitelistedUser[_address] = false;
+        emit UserRemoved(msg.sender,_address);
+    }
+
+    /**
      * @dev whitelistAdmin is used to whitelist the admin.
      * Requirement:
-     * - This function can only called by owner of teh contract
+     * - This function can only called by owner of the contract
      * @param _address - new admint address
+     * Emits a {AdminWhitelisted} event.
     */
 
     function whitelistAdmin(address _address) public onlyOwner{
@@ -252,6 +281,7 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
      * Requirement:
      * - This function can only called by owner of teh contract
      * @param _address -  admint address
+     * Emits a {AdminRemoved} event.
     */
 
     function removeWAdmin(address _address) public onlyOwner{
@@ -269,8 +299,9 @@ contract Pikachu is ERC721, ERC721Enumerable, ERC721URIStorage, Pausable, Ownabl
         if(publicSaleBool == false){
         publicSaleBool = true;
         publicSales = 'Active';
-        publicLimit = (publicLimit + whitelistLimit);
-        whitelistLimit = whitelistLimit * 0 ;
+        totalPublicLimit = (publicLimitLeft + whitelistLimitLeft);
+        publicLimitLeft = (publicLimitLeft + whitelistLimitLeft);
+        whitelistLimitLeft = whitelistLimitLeft * 0 ;
         }else{
         publicSaleBool = false;
         publicSales = 'Disabled';
